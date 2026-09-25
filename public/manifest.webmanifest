@@ -1,15 +1,19 @@
 {
   "name": "Heimatliebe Institute",
   "short_name": "Heimatliebe",
-  "description": "Language school portal and website — Karonga, Malawi",
-  "start_url": "/login.html",
-  "scope": "/",
+  "description": "Courses, student portal and staff workspace of Heimatliebe Institute, Karonga.",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f4ef",
+  "background_color": "#1b4332",
   "theme_color": "#1b4332",
   "icons": [
     { "src": "/img/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/img/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "/img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "My portal", "url": "/portal" },
+    { "name": "Staff workspace", "url": "/admin" },
+    { "name": "Apply", "url": "/apply" }
   ]
 }
