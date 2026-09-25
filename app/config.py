@@ -61,10 +61,18 @@ def _database() -> tuple[str, dict]:
     Accepts the connection strings Supabase, Neon, Render and Railway hand out
     (postgres://…?sslmode=require&channel_binding=require) and converts them for asyncpg.
     """
-    url = _get("DATABASE_URL")
+    url = _get("DATABASE_URL").strip().strip('"').strip("'")
     if not url:
         VAR_DIR.mkdir(parents=True, exist_ok=True)
         return f"sqlite+aiosqlite:///{VAR_DIR / 'heimatliebe.db'}", {}
+    # Catch the usual copy-paste mistakes with a clear message instead of a driver traceback.
+    if not url.startswith(("postgres://", "postgresql://", "postgresql+asyncpg://", "sqlite")):
+        sys.exit("DATABASE_URL must be a PostgreSQL connection string starting with postgresql:// "
+                 f"(it starts with {url.split(':', 1)[0]!r}). In Supabase use Project Settings → Database → "
+                 "Connection string → Session pooler, not the project URL.")
+    if "[YOUR-PASSWORD]" in url or "[" in urlsplit(url).netloc:
+        sys.exit("DATABASE_URL still contains the [YOUR-PASSWORD] placeholder. Replace it with your database password "
+                 "(without the square brackets).")
     for prefix in ("postgres://", "postgresql://"):
         if url.startswith(prefix):
             url = "postgresql+asyncpg://" + url[len(prefix):]

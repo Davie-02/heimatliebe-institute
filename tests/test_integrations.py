@@ -140,3 +140,13 @@ async def test_public_file_serving_with_etag(client, school):
     r = await client.get(url)
     assert r.status_code == 200 and "immutable" in r.headers["cache-control"]
     assert (await client.get(url, headers={"If-None-Match": r.headers["etag"]})).status_code == 304
+
+
+def test_database_url_mistakes_give_clear_errors(monkeypatch):
+    from app import config
+    monkeypatch.setenv("DATABASE_URL", "https://abcd.supabase.co")
+    with pytest.raises(SystemExit, match="Session pooler"):
+        config._database()
+    monkeypatch.setenv("DATABASE_URL", "postgresql://postgres.abcd:[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres")
+    with pytest.raises(SystemExit, match="placeholder"):
+        config._database()
