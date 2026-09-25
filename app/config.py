@@ -11,11 +11,12 @@ APP_ENV controls safety checks:
 from __future__ import annotations
 
 import os
+import re
 import secrets
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_DIR = ROOT / "public"
@@ -55,6 +56,22 @@ def _secret_key() -> str:
     return path.read_text().strip()
 
 
+_CREDENTIALS = re.compile(r"^(?P<scheme>[a-z0-9+]+://)(?P<user>[^:/@]+):(?P<password>.*)@(?P<rest>[^@/]+(?:/.*)?)$", re.S)
+
+
+def _encode_password(url: str) -> str:
+    """Percent-encode the password so characters like @ # / ? : in it don't break the URL.
+
+    Supabase and other providers show connection strings with the raw password. Everything up to the
+    *last* "@" before the host is treated as the password, and already-encoded passwords are left as they are.
+    """
+    match = _CREDENTIALS.match(url)
+    if not match:
+        return url
+    password = quote(unquote(match["password"]), safe="")
+    return f"{match['scheme']}{match['user']}:{password}@{match['rest']}"
+
+
 def _database() -> tuple[str, dict]:
     """Return an async SQLAlchemy URL plus driver options.
 
@@ -76,6 +93,7 @@ def _database() -> tuple[str, dict]:
     for prefix in ("postgres://", "postgresql://"):
         if url.startswith(prefix):
             url = "postgresql+asyncpg://" + url[len(prefix):]
+    url = _encode_password(url)
     parts = urlsplit(url)
     query = dict(parse_qsl(parts.query))
     connect_args: dict = {}
@@ -85,9 +103,20 @@ def _database() -> tuple[str, dict]:
     if sslmode in ("require", "verify-ca", "verify-full") or "supabase" in parts.netloc or "neon.tech" in parts.netloc:
         connect_args["ssl"] = "require"
     # Transaction-mode poolers (Supabase port 6543, PgBouncer) can't keep prepared statements.
-    if parts.port == 6543 or query.pop("pgbouncer", None) == "true":
+    try:
+        port = parts.port
+    except ValueError:
+        port = None  # reported clearly by the check below
+    if port == 6543 or query.pop("pgbouncer", None) == "true":
         connect_args["statement_cache_size"] = 0
-    return urlunsplit(parts._replace(query=urlencode(query))), connect_args
+    final = urlunsplit(parts._replace(query=urlencode(query)))
+    try:
+        from sqlalchemy.engine import make_url
+        make_url(final)
+    except Exception:
+        sys.exit("DATABASE_URL could not be read. Copy the Session pooler connection string from Supabase again, "
+                 "check there are no spaces or line breaks inside it, and make sure the password is filled in.")
+    return final, connect_args
 
 
 @dataclass

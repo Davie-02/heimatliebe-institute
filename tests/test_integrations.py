@@ -150,3 +150,25 @@ def test_database_url_mistakes_give_clear_errors(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql://postgres.abcd:[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres")
     with pytest.raises(SystemExit, match="placeholder"):
         config._database()
+
+
+@pytest.mark.parametrize("password", ["p@ss#word/1?x", "abc:def@", "100%sure", "already%40encoded", "plain123"])
+def test_database_passwords_with_special_characters(monkeypatch, password):
+    from urllib.parse import unquote
+    from sqlalchemy.engine import make_url
+    from app import config
+    host = "aws-0-eu-central-1.pooler.supabase.com:5432"
+    monkeypatch.setenv("DATABASE_URL", f"postgresql://postgres.abcd:{password}@{host}/postgres")
+    url, args = config._database()
+    parsed = make_url(url)
+    assert parsed.host == "aws-0-eu-central-1.pooler.supabase.com" and parsed.port == 5432 and parsed.database == "postgres"
+    assert parsed.username == "postgres.abcd" and parsed.password == unquote(password)
+    assert args["ssl"] == "require"
+
+
+def test_unreadable_database_url_hides_password(monkeypatch, capsys):
+    from app import config
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:secret-pass@host:notaport/db")
+    with pytest.raises(SystemExit) as exc:
+        config._database()
+    assert "secret-pass" not in str(exc.value)
