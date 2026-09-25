@@ -1,0 +1,53 @@
+# Render Blueprint — creates both environments from this repository.
+#   heimatliebe          production, deploys every push to `main`
+#   heimatliebe-staging  test site, deploys every push to `staging` (fresh demo data on each start)
+# Values marked `sync: false` are secrets you paste into the Render dashboard once.
+services:
+  - type: web
+    name: heimatliebe
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+    healthCheckPath: /api/health
+    envVars:
+      - { key: PYTHON_VERSION, value: 3.12.7 }
+      - { key: APP_ENV, value: production }
+      - { key: TZ, value: Africa/Blantyre }
+      - { key: SECRET_KEY, generateValue: true }
+      - { key: DATABASE_URL, sync: false }
+      - { key: SITE_URL, sync: false }
+      - { key: ADMIN_PASSWORD, sync: false }
+      - { key: ADMIN_EMAIL, sync: false }
+      - { key: SMTP_USER, sync: false }
+      - { key: SMTP_PASS, sync: false }
+      - { key: SMTP_FROM, sync: false }
+      - { key: S3_ENDPOINT, sync: false }
+      - { key: S3_REGION, sync: false }
+      - { key: S3_BUCKET, sync: false }
+      - { key: S3_ACCESS_KEY, sync: false }
+      - { key: S3_SECRET_KEY, sync: false }
+      - { key: GOOGLE_CLIENT_ID, sync: false }
+      - { key: GOOGLE_CLIENT_SECRET, sync: false }
+      - { key: GOOGLE_WORKSPACE_DOMAIN, sync: false }
+
+  - type: web
+    name: heimatliebe-staging
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: staging
+    autoDeploy: true
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+    healthCheckPath: /api/health
+    envVars:
+      - { key: PYTHON_VERSION, value: 3.12.7 }
+      - { key: APP_ENV, value: staging }
+      - { key: TZ, value: Africa/Blantyre }
+      - { key: SECRET_KEY, generateValue: true }
+      - { key: ADMIN_PASSWORD, value: staging-admin-123 }
+      - { key: RUN_SCHEDULER, value: "false" }
