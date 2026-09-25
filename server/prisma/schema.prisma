@@ -1,0 +1,847 @@
+// Heimatliebe Institute — database schema (PostgreSQL, e.g. Neon).
+//
+// Two kinds of people sign in:
+//   Staff    – everyone who works at the institute (teachers, admissions, finance, HR, directors).
+//              What each person can do comes from their department plus per-person overrides
+//              (see src/access/modules.ts). Role OWNER is the system administrator.
+//   Student  – learners, created when an application is accepted (or added by admissions).
+//
+// Changing this file: run `npx prisma migrate dev --name <what-changed>` locally and commit the new
+// folder under prisma/migrations. Render applies it on deploy with `prisma migrate deploy`.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  // Neon/Supabase give a pooled URL for the app and a direct one for migrations. Both may be the same.
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── People & sign-in ────────────────────────────────────────────────────────
+
+enum StaffRole {
+  OWNER // system administrator: everything, must use two-step verification
+  MANAGER // management defaults on top of their department
+  EMPLOYEE // department defaults only
+}
+
+model Staff {
+  id                    String    @id @default(cuid())
+  staffNo               String?   @unique
+  name                  String
+  email                 String    @unique
+  phone                 String?
+  role                  StaffRole @default(EMPLOYEE)
+  department            String    @default("general")
+  jobTitle              String?
+  bio                   String?
+  photoUrl              String?
+  /// Per-person module access overrides: { "finance": "view", ... }
+  permissions           Json      @default("{}")
+  isActive              Boolean   @default(true)
+  passwordHash          String
+  mustChangePassword    Boolean   @default(false)
+  tempPasswordExpiresAt DateTime?
+  totpEnabled           Boolean   @default(false)
+  totpSecret            String?
+  recoveryCodeHashes    String[]  @default([])
+  lastTotpStep          Int?
+  failedLoginCount      Int       @default(0)
+  lockedUntil           DateTime?
+  lastLoginAt           DateTime?
+  passwordChangedAt     DateTime?
+  sessionsRevokedAt     DateTime?
+  stepUpUntil           DateTime?
+  googleId              String?   @unique
+  facebookId            String?   @unique
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  classes       ClassGroup[]      @relation("ClassTeacher")
+  leaveRequests LeaveRequest[]    @relation("LeaveOwner")
+  enquiries     Enquiry[]         @relation("EnquiryOwner")
+  assessments   SkillAssessment[]
+}
+
+model Student {
+  id                String    @id @default(cuid())
+  studentNo         String    @unique
+  name              String
+  email             String    @unique
+  phone             String?
+  status            String    @default("active") // active | inactive | suspended | graduated
+  course            String?
+  level             String?
+  dateOfBirth       DateTime? @db.Date
+  gender            String?
+  nationality       String?
+  address           String?
+  guardianName      String?
+  guardianPhone     String?
+  photoUrl          String?
+  notes             String?
+  isActive          Boolean   @default(true)
+  /// Null until the student chooses a password through their invitation link.
+  passwordHash      String?
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime?
+  sessionsRevokedAt DateTime?
+  googleId          String?   @unique
+  facebookId        String?   @unique
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  enrollments             Enrollment[]
+  submissions             Submission[]
+  attempts                ExamAttempt[]
+  attendance              Attendance[]
+  assessments             SkillAssessment[]
+  certificates            Certificate[]
+  invoices                Invoice[]
+  payments                Payment[]
+  evaluations             CourseEvaluation[]
+  scholarshipApplications ScholarshipApplication[]
+  application             Application?
+
+  @@index([status])
+  @@index([name])
+}
+
+/// One-time links: password reset (both realms) and student invitations ("choose your password").
+model AuthToken {
+  id        String    @id @default(cuid())
+  realm     String // staff | student
+  accountId String
+  purpose   String // reset | invite
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([realm, accountId])
+}
+
+/// Sessions signed out before they expired (so a copied token stops working immediately).
+model RevokedSession {
+  jti       String   @id
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+// ─── Admissions ─────────────────────────────────────────────────────────────
+
+model Application {
+  id                 String    @id @default(cuid())
+  reference          String    @unique
+  name               String
+  email              String
+  phone              String?
+  course             String
+  level              String    @default("A1")
+  dateOfBirth        DateTime? @db.Date
+  gender             String?
+  nationality        String?
+  address            String?
+  guardianName       String?
+  guardianPhone      String?
+  preferredSchedule  String?
+  motivation         String?
+  source             String?
+  placementAttemptId String?
+  paymentProofUrl    String?
+  status             String    @default("pending") // pending | reviewing | accepted | waitlisted | rejected
+  notes              String?
+  studentId          String?   @unique
+  student            Student?  @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  reviewedAt         DateTime?
+  reviewedBy         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+model Enquiry {
+  id           String    @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  interest     String?
+  message      String?
+  channel      String    @default("website") // website | walk-in | phone | whatsapp | email | social
+  status       String    @default("new") // new | contacted | follow_up | converted | closed
+  assignedToId String?
+  assignedTo   Staff?    @relation("EnquiryOwner", fields: [assignedToId], references: [id], onDelete: SetNull)
+  nextFollowUp DateTime? @db.Date
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([nextFollowUp])
+}
+
+model PlacementAttempt {
+  id               String   @id @default(cuid())
+  name             String
+  email            String?
+  phone            String?
+  language         String
+  answers          Json
+  score            Int
+  total            Int
+  recommendedLevel String
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ─── Teaching ───────────────────────────────────────────────────────────────
+
+model Course {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  language  String
+  level     String?
+  status    String   @default("Enrolling now")
+  schedule  String?
+  duration  String?
+  feeText   String?
+  feeAmount Decimal? @db.Decimal(12, 2)
+  capacity  Int?
+  summary   String?
+  body      String?
+  image     String?
+  published Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classes ClassGroup[]
+  fees    Fee[]
+
+  @@index([published, position])
+}
+
+model ClassGroup {
+  id          String    @id @default(cuid())
+  name        String
+  courseId    String?
+  course      Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  teacherId   String?
+  teacher     Staff?    @relation("ClassTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+  level       String?
+  room        String?
+  schedule    String?
+  mode        String    @default("in-person") // in-person | online | hybrid
+  meetingUrl  String?
+  startDate   DateTime? @db.Date
+  endDate     DateTime? @db.Date
+  maxStudents Int       @default(30)
+  status      String    @default("active") // planned | active | completed | cancelled
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  enrollments Enrollment[]
+  timetable   TimetableEntry[]
+  assignments Assignment[]
+  exams       Exam[]
+  attendance  Attendance[]
+
+  @@index([teacherId])
+  @@index([status])
+}
+
+model Enrollment {
+  id        String     @id @default(cuid())
+  classId   String
+  class     ClassGroup @relation(fields: [classId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  status    String     @default("active") // active | waitlisted | completed | dropped
+  createdAt DateTime   @default(now())
+
+  @@unique([classId, studentId])
+  @@index([studentId])
+}
+
+model TimetableEntry {
+  id        String     @id @default(cuid())
+  classId   String
+  class     ClassGroup @relation(fields: [classId], references: [id], onDelete: Cascade)
+  dayOfWeek Int // 0 = Sunday … 6 = Saturday
+  startTime String // "08:00"
+  endTime   String
+  room      String?
+
+  @@index([classId])
+  @@index([dayOfWeek])
+}
+
+model Assignment {
+  id            String     @id @default(cuid())
+  classId       String
+  class         ClassGroup @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  attachmentUrl String?
+  skill         String? // reading | writing | listening | speaking | grammar | vocabulary
+  dueAt         DateTime?
+  totalPoints   Int        @default(100)
+  published     Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+
+  submissions Submission[]
+
+  @@index([classId, dueAt])
+}
+
+model Submission {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  content      String?
+  fileUrl      String?
+  grade        Float?
+  feedback     String?
+  submittedAt  DateTime   @default(now())
+  gradedAt     DateTime?
+
+  @@unique([assignmentId, studentId])
+  @@index([studentId])
+}
+
+/// Online exams and quizzes. `questions` holds the paper:
+/// [{ id, type: "choice"|"multi"|"truefalse"|"short"|"essay", prompt, options?, answer?, points }]
+model Exam {
+  id              String      @id @default(cuid())
+  classId         String?
+  class           ClassGroup? @relation(fields: [classId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  opensAt         DateTime?
+  closesAt        DateTime?
+  durationMinutes Int         @default(60)
+  questions       Json        @default("[]")
+  passMark        Int         @default(50)
+  published       Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+
+  attempts ExamAttempt[]
+
+  @@index([classId, opensAt])
+}
+
+model ExamAttempt {
+  id          String    @id @default(cuid())
+  examId      String
+  exam        Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  answers     Json      @default("{}")
+  score       Float?
+  total       Float?
+  percentage  Float?
+  passed      Boolean?
+  needsReview Boolean   @default(false)
+  feedback    String?
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  gradedAt    DateTime?
+
+  @@unique([examId, studentId])
+  @@index([needsReview])
+}
+
+model Attendance {
+  id        String     @id @default(cuid())
+  classId   String
+  class     ClassGroup @relation(fields: [classId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  date      DateTime   @db.Date
+  status    String     @default("present") // present | absent | late | excused
+  notes     String?
+
+  @@unique([classId, studentId, date])
+  @@index([studentId, date])
+}
+
+model SkillAssessment {
+  id           String   @id @default(cuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId      String?
+  term         String?
+  reading      Float?
+  writing      Float?
+  listening    Float?
+  speaking     Float?
+  cefrLevel    String?
+  comments     String?
+  assessedById String?
+  assessedBy   Staff?   @relation(fields: [assessedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+
+  @@index([studentId, createdAt])
+}
+
+model Certificate {
+  id               String   @id @default(cuid())
+  certificateNo    String   @unique
+  verificationCode String   @unique
+  studentId        String?
+  student          Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  holderName       String
+  course           String
+  level            String?
+  grade            String?
+  hours            Int?
+  issuedAt         DateTime @default(now()) @db.Date
+  revoked          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+}
+
+model CourseEvaluation {
+  id            String   @id @default(cuid())
+  studentId     String
+  student       Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classId       String
+  courseRating  Int
+  teacherRating Int
+  comments      String?
+  createdAt     DateTime @default(now())
+
+  @@unique([studentId, classId])
+}
+
+/// Official exams held at the institute (e.g. Goethe-Zertifikat) that anyone can register for.
+model ExamSession {
+  id                   String    @id @default(cuid())
+  provider             String    @default("Goethe-Institut")
+  title                String
+  level                String?
+  modules              String?
+  examDate             DateTime  @db.Date
+  registrationDeadline DateTime? @db.Date
+  venue                String?
+  fee                  Decimal?  @db.Decimal(12, 2)
+  capacity             Int?
+  published            Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+
+  registrations ExamRegistration[]
+}
+
+model ExamRegistration {
+  id              String      @id @default(cuid())
+  sessionId       String
+  session         ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  name            String
+  email           String
+  phone           String?
+  dateOfBirth     DateTime?   @db.Date
+  passportNo      String?
+  modules         String?
+  paymentProofUrl String?
+  status          String      @default("pending") // pending | confirmed | cancelled | sat
+  result          String?
+  createdAt       DateTime    @default(now())
+
+  @@index([sessionId, status])
+}
+
+// ─── Finance ────────────────────────────────────────────────────────────────
+
+model Fee {
+  id          String   @id @default(cuid())
+  name        String
+  courseId    String?
+  course      Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  amount      Decimal  @db.Decimal(12, 2)
+  frequency   String   @default("term") // one-time | monthly | term | yearly
+  type        String   @default("tuition") // tuition | application | exam | materials | late_fee | other
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Invoice {
+  id             String    @id @default(cuid())
+  invoiceNo      String    @unique
+  studentId      String
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  description    String
+  amount         Decimal   @db.Decimal(12, 2)
+  discount       Decimal   @default(0) @db.Decimal(12, 2)
+  paid           Decimal   @default(0) @db.Decimal(12, 2)
+  dueDate        DateTime? @db.Date
+  status         String    @default("pending") // pending | partial | paid | overdue | cancelled
+  reminderSentAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  payments Payment[]
+
+  @@index([studentId, createdAt])
+  @@index([status, dueDate])
+}
+
+model Payment {
+  id          String    @id @default(cuid())
+  receiptNo   String?   @unique
+  invoiceId   String?
+  invoice     Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  studentId   String
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  amount      Decimal   @db.Decimal(12, 2)
+  method      String    @default("bank") // airtel | tnm | bank | cash | card
+  reference   String?
+  note        String?
+  proofUrl    String?
+  status      String    @default("pending") // pending | confirmed | rejected
+  confirmedAt DateTime?
+  confirmedBy String?
+  createdAt   DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([studentId])
+}
+
+model Scholarship {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  criteria    String?
+  amount      Decimal?  @db.Decimal(12, 2)
+  deadline    DateTime? @db.Date
+  open        Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  applications ScholarshipApplication[]
+}
+
+model ScholarshipApplication {
+  id            String      @id @default(cuid())
+  scholarshipId String
+  scholarship   Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  statement     String?
+  status        String      @default("pending") // pending | awarded | rejected
+  createdAt     DateTime    @default(now())
+
+  @@unique([scholarshipId, studentId])
+}
+
+// ─── Communication ──────────────────────────────────────────────────────────
+
+/// A conversation between any mix of staff and students.
+model Conversation {
+  id           String                    @id @default(cuid())
+  subject      String?
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @default(now())
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  kind           String // staff | student
+  personId       String
+  name           String
+  lastReadAt     DateTime?
+
+  @@unique([conversationId, kind, personId])
+  @@index([kind, personId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderKind     String
+  senderId       String
+  senderName     String
+  body           String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  kind      String // staff | student
+  personId  String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([kind, personId, createdAt])
+}
+
+model Announcement {
+  id        String    @id @default(cuid())
+  title     String
+  body      String?
+  audience  String    @default("all") // all | students | staff | public
+  pinned    Boolean   @default(false)
+  published Boolean   @default(true)
+  expiresAt DateTime? @db.Date
+  createdBy String?
+  createdAt DateTime  @default(now())
+
+  @@index([published, createdAt])
+}
+
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  type        String    @default("event") // term | holiday | exam | event | deadline
+  startDate   DateTime  @db.Date
+  endDate     DateTime? @db.Date
+  public      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([startDate])
+}
+
+// ─── People (HR) ────────────────────────────────────────────────────────────
+
+model LeaveRequest {
+  id         String   @id @default(cuid())
+  staffId    String
+  staff      Staff    @relation("LeaveOwner", fields: [staffId], references: [id], onDelete: Cascade)
+  type       String   @default("annual") // annual | sick | maternity | study | unpaid | other
+  startDate  DateTime @db.Date
+  endDate    DateTime @db.Date
+  days       Int
+  reason     String?
+  status     String   @default("pending") // pending | approved | rejected | cancelled
+  reviewedBy String?
+  reviewNote String?
+  createdAt  DateTime @default(now())
+
+  @@index([staffId, startDate])
+  @@index([status])
+}
+
+// ─── Website content ────────────────────────────────────────────────────────
+
+/// Editable blocks of website text and institute settings, one JSON value per key ("site", "institution", …).
+model SiteContent {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model NewsPost {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  category    String?
+  summary     String?
+  body        String?
+  image       String?
+  publishedAt DateTime? @default(now())
+  published   Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([published, publishedAt])
+}
+
+model GalleryItem {
+  id        String   @id @default(cuid())
+  src       String
+  caption   String?
+  category  String?
+  position  Int      @default(0)
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model DownloadDocument {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  type        String?
+  file        String
+  published   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  course    String?
+  body      String
+  photo     String?
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Faq {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  category  String?
+  position  Int      @default(0)
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model LibraryItem {
+  id          String   @id @default(cuid())
+  title       String
+  author      String?
+  language    String?
+  level       String?
+  type        String? // book | audio | video | worksheet | link
+  fileUrl     String?
+  coverUrl    String?
+  description String?
+  free        Boolean  @default(true)
+  published   Boolean  @default(true)
+  downloads   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@index([published, language])
+}
+
+model Alumnus {
+  id             String   @id @default(cuid())
+  name           String
+  email          String?
+  course         String?
+  graduationYear Int?
+  currentJob     String?
+  location       String?
+  story          String?
+  createdAt      DateTime @default(now())
+}
+
+// ─── Workspace & system ─────────────────────────────────────────────────────
+
+/// Everything staff change, with the "before" needed to undo it.
+model ActivityLog {
+  id        String    @id @default(cuid())
+  actorKind String // staff | student | system | public
+  actorId   String?
+  actorName String?
+  action    String // created | updated | deleted | approved | …
+  entity    String?
+  entityId  String?
+  summary   String
+  /// { model, id, before } – null when the action can't be undone.
+  undo      Json?
+  undoneAt  DateTime?
+  undoneBy  String?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entity, entityId])
+}
+
+/// "How do I…?" help pages for each workspace area, editable by the system administrator.
+model Guide {
+  key       String   @id
+  module    String
+  title     String
+  body      String
+  position  Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+/// Links to Google Workspace, Moodle and other tools, shown in the portals.
+model ExternalApp {
+  id          String   @id @default(cuid())
+  name        String
+  url         String
+  description String?
+  icon        String   @default("grid")
+  audience    String   @default("all") // all | students | staff
+  embed       Boolean  @default(false)
+  position    Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+/// Outgoing webhooks: the institute's other systems get a signed POST when something happens.
+model Webhook {
+  id         String    @id @default(cuid())
+  name       String
+  url        String
+  events     String    @default("*")
+  secret     String
+  active     Boolean   @default(true)
+  lastStatus String?
+  lastSentAt DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model Upload {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  filename    String
+  contentType String
+  size        Int
+  isPublic    Boolean  @default(true)
+  uploadedBy  String?
+  createdAt   DateTime @default(now())
+}
+
+// ─── Assistant ──────────────────────────────────────────────────────────────
+
+/// Questions visitors asked the website assistant, kept to improve the FAQ (no personal details stored).
+model AssistantLog {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String?
+  answered  Boolean  @default(true)
+  source    String? // direct | model | fallback
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// FAQ entries the assistant drafted from repeated questions, waiting for a person to approve them.
+model FaqSuggestion {
+  id        String   @id @default(cuid())
+  question  String
+  answer    String
+  asked     Int      @default(1)
+  status    String   @default("draft") // draft | published | dismissed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+/// Documents staff upload so the assistant can answer from them (handbooks, fee schedules…).
+model KnowledgeNote {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
