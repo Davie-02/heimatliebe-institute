@@ -144,9 +144,11 @@ async def test_public_file_serving_with_etag(client, school):
 
 def test_database_url_mistakes_give_clear_errors(monkeypatch):
     from app import config
-    monkeypatch.setenv("DATABASE_URL", "https://abcd.supabase.co")
-    with pytest.raises(SystemExit, match="Session pooler"):
-        config._database()
+    for wrong in ("https://abcd.supabase.co", "mtbuubrizbrdxleuktbq", "secretpw@host"):
+        monkeypatch.setenv("DATABASE_URL", wrong)
+        with pytest.raises(SystemExit, match="Session pooler") as exc:
+            config._database()
+        assert wrong.split("@")[0] not in str(exc.value)
     monkeypatch.setenv("DATABASE_URL", "postgresql://postgres.abcd:[YOUR-PASSWORD]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres")
     with pytest.raises(SystemExit, match="placeholder"):
         config._database()

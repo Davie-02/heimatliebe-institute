@@ -84,9 +84,10 @@ def _database() -> tuple[str, dict]:
         return f"sqlite+aiosqlite:///{VAR_DIR / 'heimatliebe.db'}", {}
     # Catch the usual copy-paste mistakes with a clear message instead of a driver traceback.
     if not url.startswith(("postgres://", "postgresql://", "postgresql+asyncpg://", "sqlite")):
-        sys.exit("DATABASE_URL must be a PostgreSQL connection string starting with postgresql:// "
-                 f"(it starts with {url.split(':', 1)[0]!r}). In Supabase use Project Settings → Database → "
-                 "Connection string → Session pooler, not the project URL.")
+        # The value is never echoed: a mistaken paste could contain the password.
+        sys.exit("DATABASE_URL is not a database connection string (it must start with postgresql://). "
+                 "In Supabase click Connect (top of the project page) → Connection string → Method: Session pooler, "
+                 "copy the whole line, replace [YOUR-PASSWORD] with the database password and paste it into Render.")
     if "[YOUR-PASSWORD]" in url or "[" in urlsplit(url).netloc:
         sys.exit("DATABASE_URL still contains the [YOUR-PASSWORD] placeholder. Replace it with your database password "
                  "(without the square brackets).")
