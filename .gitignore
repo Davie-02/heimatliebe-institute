@@ -1,0 +1,13 @@
+# Local settings and secrets
+.env
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# Runtime data (local database and uploads)
+var/
+*.db
+*.db-wal
+*.db-shm
+.DS_Store
