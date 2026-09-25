@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b4332">
+  <title>Library · Heimatliebe Institute</title>
+  <meta name="description" content="Books, grammar guides, exercises and exam preparation material from Heimatliebe Institute.">
+  <link rel="icon" href="/img/icon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/img/icon-180.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
+  <script src="/js/api.js" defer></script>
+  <script src="/js/ui.js" defer></script>
+  <script src="/js/site.js" defer></script>
+  <script src="/js/pages/library.js" defer></script>
+</head>
+<body>
+<header class="site-header">
+  <a class="site-logo" href="/"><img src="/img/mark.png" alt="" width="38" height="38">Heimatliebe <span>Institute</span></a>
+  <button class="nav-toggle" data-action="toggleNav" aria-label="Open menu" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#i-menu"></use></svg></button>
+  <nav class="site-nav" id="site-nav" aria-label="Main">
+    <a href="/">Home</a>
+    <a href="/#courses">Courses</a>
+    <a href="/library.html">Library</a>
+    <a href="/exams.html">Goethe exams</a>
+    <a href="/placement.html">Placement test</a>
+    <a href="/login.html">Sign in</a>
+    <a class="btn btn-gold btn-sm" href="/apply.html">Apply now</a>
+  </nav>
+</header>
+<main class="page" id="main">
+  <div class="panel mb-md">
+    <div class="eyebrow">Resources</div>
+    <h1>Library</h1>
+    <p class="lead">Textbooks, grammar guides, vocabulary lists and exam preparation. Some resources are for enrolled students — sign in to open them.</p>
+    <div class="toolbar" style="margin:0">
+      <input class="form-input search-input" type="search" data-q placeholder="Search title, author, topic…" aria-label="Search the library">
+      <select class="form-select" data-language aria-label="Language"><option value="">All languages</option></select>
+      <select class="form-select" data-level aria-label="Level"><option value="">All levels</option></select>
+      <select class="form-select" data-type aria-label="Type"><option value="">All types</option></select>
+    </div>
+  </div>
+  <p class="text-sm text-muted" data-count></p>
+  <div class="grid-auto" data-items><div class="skeleton" style="height:240px"></div><div class="skeleton" style="height:240px"></div></div>
+</main>
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div><div class="footer-brand">Heimatliebe Institute</div><div>Karonga, Northern Region, Malawi</div><div class="mt-sm">&copy; <span data-year></span> Heimatliebe Institute</div></div>
+    <div class="footer-links"><a href="/apply.html">Apply</a><a href="/status.html">Track application</a><a href="/placement.html">Placement test</a><a href="/exams.html">Goethe exams</a><a href="/verify.html">Verify a certificate</a><a href="/login.html">Portal sign-in</a></div>
+    <div class="footer-links" data-social></div>
+  </div>
+</footer>
+</body>
+</html>

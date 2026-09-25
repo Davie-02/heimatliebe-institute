@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1b4332">
+  <title>Apply online · Heimatliebe Institute</title>
+  <meta name="description" content="Apply online for a language course at Heimatliebe Institute in Karonga, Malawi.">
+  <link rel="icon" href="/img/icon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/img/icon-180.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="stylesheet" href="/css/site.css">
+  <script src="/js/theme.js"></script>
+  <script src="/js/api.js" defer></script>
+  <script src="/js/ui.js" defer></script>
+  <script src="/js/site.js" defer></script>
+  <script src="/js/pages/apply.js" defer></script>
+</head>
+<body>
+<header class="site-header">
+  <a class="site-logo" href="/"><img src="/img/mark.png" alt="" width="38" height="38">Heimatliebe <span>Institute</span></a>
+  <button class="nav-toggle" data-action="toggleNav" aria-label="Open menu" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#i-menu"></use></svg></button>
+  <nav class="site-nav" id="site-nav" aria-label="Main">
+    <a href="/">Home</a>
+    <a href="/#courses">Courses</a>
+    <a href="/library.html">Library</a>
+    <a href="/exams.html">Goethe exams</a>
+    <a href="/placement.html">Placement test</a>
+    <a href="/login.html">Sign in</a>
+    <a class="btn btn-gold btn-sm" href="/apply.html">Apply now</a>
+  </nav>
+</header>
+<main class="page" id="main">
+  <div class="panel">
+    <div class="eyebrow">Admissions</div>
+    <h1>Apply for a course</h1>
+    <p class="lead">It takes about five minutes. After you pay the fee (Airtel Money, TNM Mpamba or bank transfer), upload the proof below. You will receive your student ID by email once it has been confirmed.</p>
+    <div data-placement-note class="alert alert-info"><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#i-compass"></use></svg><div>Not sure about your level? <a href="/placement.html">Take the free 10-minute placement test</a> first.</div></div>
+    <div data-status></div>
+    <form id="apply-form" class="form-grid" novalidate>
+      <div class="form-group full"><label class="form-label" for="a-name">Full name *</label><input class="form-input" id="a-name" name="full_name" required autocomplete="name"></div>
+      <div class="form-group"><label class="form-label" for="a-email">Email *</label><input class="form-input" id="a-email" name="email" type="email" required autocomplete="email"></div>
+      <div class="form-group"><label class="form-label" for="a-phone">Phone / WhatsApp *</label><input class="form-input" id="a-phone" name="phone" type="tel" required autocomplete="tel" placeholder="+265 …"></div>
+      <div class="form-group"><label class="form-label" for="a-course">Language *</label><select class="form-select" id="a-course" name="course" required><option value="">Choose…</option>
+        <option>German</option><option>French</option><option>Swahili</option><option>Spanish</option><option>Chinese</option><option>Latin</option><option>English</option></select></div>
+      <div class="form-group"><label class="form-label" for="a-level">Level *</label><select class="form-select" id="a-level" name="level" required><option value="">Choose…</option>
+        <option>A1</option><option>A2</option><option>B1</option><option>B2</option><option>C1</option><option>C2</option></select></div>
+      <div class="form-group"><label class="form-label" for="a-dob">Date of birth</label><input class="form-input" id="a-dob" name="date_of_birth" type="date"></div>
+      <div class="form-group"><label class="form-label" for="a-gender">Gender</label><select class="form-select" id="a-gender" name="gender"><option value="">Prefer not to say</option><option>female</option><option>male</option><option>other</option></select></div>
+      <div class="form-group"><label class="form-label" for="a-nat">Nationality</label><input class="form-input" id="a-nat" name="nationality" placeholder="Malawian"></div>
+      <div class="form-group"><label class="form-label" for="a-sched">Preferred schedule</label><select class="form-select" id="a-sched" name="preferred_schedule"><option value="">Any</option><option>Morning</option><option>Afternoon</option><option>Evening</option><option>Weekend</option><option>Online</option></select></div>
+      <div class="form-group full"><label class="form-label" for="a-addr">Address</label><input class="form-input" id="a-addr" name="address" autocomplete="street-address"></div>
+      <div class="form-group"><label class="form-label" for="a-gname">Guardian / emergency contact</label><input class="form-input" id="a-gname" name="guardian_name" placeholder="Required for students under 18"></div>
+      <div class="form-group"><label class="form-label" for="a-gphone">Guardian phone</label><input class="form-input" id="a-gphone" name="guardian_phone" type="tel"></div>
+      <div class="form-group full"><label class="form-label" for="a-why">Why do you want to learn this language?</label><textarea class="form-textarea" id="a-why" name="motivation" rows="3" placeholder="Study, work, Au-pair, Ausbildung, travel …"></textarea></div>
+      <div class="form-group"><label class="form-label" for="a-src">How did you hear about us?</label><select class="form-select" id="a-src" name="source"><option value="">—</option><option>Friend or family</option><option>Facebook</option><option>WhatsApp</option><option>Instagram or TikTok</option><option>Radio</option><option>Walked past</option><option>Other</option></select></div>
+      <div></div>
+      <div class="form-group"><label class="form-label" for="a-pw">Create a password *</label><input class="form-input" id="a-pw" name="password" type="password" minlength="8" required autocomplete="new-password"><div class="strength"><span data-strength></span></div>
+        <div class="form-hint">At least 8 characters. You'll sign in with your student ID and this password.</div></div>
+      <div class="form-group"><label class="form-label" for="a-pw2">Repeat password *</label><input class="form-input" id="a-pw2" name="password2" type="password" minlength="8" required autocomplete="new-password"></div>
+      <div class="form-group full"><span class="form-label">Proof of payment *</span>
+        <label class="drop" data-drop><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#i-upload"></use></svg><div><strong>Choose a file</strong> or drag it here</div><div class="text-sm">Photo or PDF of your payment confirmation · up to 10 MB</div><div class="text-sm mt-sm" data-file-name></div>
+          <input type="file" name="proof" accept="image/*,.pdf" required></label></div>
+      <div class="full"><button class="btn btn-primary btn-lg" type="submit">Submit application</button></div>
+    </form>
+    <div data-done class="success" hidden><svg class="icon" aria-hidden="true"><use href="/img/icons.svg#i-check-circle"></use></svg><h2>Application received</h2>
+      <p class="lead">A confirmation email is on its way. Keep your reference to check progress:</p><div class="id-box" data-reference></div>
+      <div class="flex gap-sm mt-md" style="justify-content:center"><a class="btn btn-primary" data-track href="/status.html">Track my application</a><a class="btn btn-outline" href="/">Back to the website</a></div></div>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div><div class="footer-brand">Heimatliebe Institute</div><div>Karonga, Northern Region, Malawi</div><div class="mt-sm">&copy; <span data-year></span> Heimatliebe Institute</div></div>
+    <div class="footer-links"><a href="/apply.html">Apply</a><a href="/status.html">Track application</a><a href="/placement.html">Placement test</a><a href="/exams.html">Goethe exams</a><a href="/verify.html">Verify a certificate</a><a href="/login.html">Portal sign-in</a></div>
+    <div class="footer-links" data-social></div>
+  </div>
+</footer>
+</body>
+</html>
