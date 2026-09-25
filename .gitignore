@@ -1,13 +1,12 @@
+# Dependencies and builds
+node_modules/
+dist/
+server/dist/
+*.tsbuildinfo
 # Local settings and secrets
 .env
-# Python
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-# Runtime data (local database and uploads)
-var/
-*.db
-*.db-wal
-*.db-shm
+.env.local
+server/.env
+# Local uploads (development only)
+server/uploads/
 .DS_Store

@@ -1,53 +1,80 @@
-# Render Blueprint — creates both environments from this repository.
-#   heimatliebe          production, deploys every push to `main`
-#   heimatliebe-staging  test site, deploys every push to `staging` (fresh demo data on each start)
-# Values marked `sync: false` are secrets you paste into the Render dashboard once.
+# Render Blueprint — the API for both environments.
+#   heimatliebe-api          production, deploys every push to `main`
+#   heimatliebe-api-staging  test copy, deploys every push to `staging` (with demo data)
+# The website itself is on Vercel (see vercel.json and docs/DEPLOYMENT.md). The database is Neon
+# (free, never expires) — there is deliberately no `databases:` block, because Render's free
+# Postgres is deleted after 30 days. Values with `sync: false` are pasted into the Render dashboard once.
 services:
   - type: web
-    name: heimatliebe
-    runtime: python
+    name: heimatliebe-api
+    runtime: node
     plan: free
     region: frankfurt
     branch: main
+    rootDir: server
     autoDeploy: true
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
     healthCheckPath: /api/health
+    # --include=dev: the Nest CLI, TypeScript and the Prisma CLI are needed to build and migrate.
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    # Applies committed database migrations, then starts (free plans have no separate pre-deploy step).
+    startCommand: npx prisma migrate deploy && npm run start:prod
     envVars:
-      - { key: PYTHON_VERSION, value: 3.12.7 }
+      - { key: NODE_ENV, value: production }
       - { key: APP_ENV, value: production }
+      - { key: NODE_VERSION, value: "20" }
       - { key: TZ, value: Africa/Blantyre }
-      - { key: SECRET_KEY, generateValue: true }
-      - { key: DATABASE_URL, sync: false }
-      - { key: SITE_URL, sync: false }
-      - { key: ADMIN_PASSWORD, sync: false }
-      - { key: ADMIN_EMAIL, sync: false }
-      - { key: SMTP_USER, sync: false }
-      - { key: SMTP_PASS, sync: false }
-      - { key: SMTP_FROM, sync: false }
-      - { key: S3_ENDPOINT, sync: false }
+      # Two proxies sit in front of the app: Vercel (forwarding /api) and Render.
+      - { key: TRUST_PROXY, value: "2" }
+      - { key: JWT_SECRET, generateValue: true }
+      - { key: DATABASE_URL, sync: false }      # Neon pooled connection string (…-pooler…?sslmode=require)
+      - { key: DIRECT_URL, sync: false }        # Neon direct connection string (for migrations)
+      - { key: FRONTEND_URL, sync: false }      # e.g. https://heimatliebe.vercel.app (comma-separate several)
+      - { key: ADMIN_EMAIL, sync: false }       # first system administrator (created on first start)
+      - { key: ADMIN_NAME, sync: false }
+      - { key: ADMIN_PASSWORD, sync: false }    # remove after the first sign-in
+      - { key: BREVO_API_KEY, sync: false }     # email (free 300/day)
+      - { key: EMAIL_FROM, sync: false }        # e.g. Heimatliebe Institute <heimatliebemw@gmail.com> (verified in Brevo)
+      - { key: EMAIL_REPLY_TO, sync: false }
+      - { key: OFFICE_NOTIFICATION_EMAIL, sync: false }
+      - { key: S3_BUCKET, sync: false }         # Backblaze B2 or Cloudflare R2 bucket
       - { key: S3_REGION, sync: false }
-      - { key: S3_BUCKET, sync: false }
-      - { key: S3_ACCESS_KEY, sync: false }
-      - { key: S3_SECRET_KEY, sync: false }
-      - { key: GOOGLE_CLIENT_ID, sync: false }
-      - { key: GOOGLE_CLIENT_SECRET, sync: false }
-      - { key: GOOGLE_WORKSPACE_DOMAIN, sync: false }
+      - { key: S3_ENDPOINT, sync: false }
+      - { key: S3_ACCESS_KEY_ID, sync: false }
+      - { key: S3_SECRET_ACCESS_KEY, sync: false }
+      - { key: GEMINI_API_KEY, sync: false }    # optional: website assistant
+      - { key: GOOGLE_CLIENT_ID, sync: false }  # optional: "Continue with Google"
+      - { key: FACEBOOK_APP_ID, sync: false }   # optional: "Continue with Facebook"
+      - { key: FACEBOOK_APP_SECRET, sync: false }
+      - { key: SYSTEM_ADMIN_ALLOWED_IPS, sync: false } # optional: limit administrators to these addresses
 
   - type: web
-    name: heimatliebe-staging
-    runtime: python
+    name: heimatliebe-api-staging
+    runtime: node
     plan: free
     region: frankfurt
     branch: staging
+    rootDir: server
     autoDeploy: true
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
     healthCheckPath: /api/health
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm run start:prod
     envVars:
-      - { key: PYTHON_VERSION, value: 3.12.7 }
+      - { key: NODE_ENV, value: production }
       - { key: APP_ENV, value: staging }
+      - { key: NODE_VERSION, value: "20" }
       - { key: TZ, value: Africa/Blantyre }
-      - { key: SECRET_KEY, generateValue: true }
-      - { key: ADMIN_PASSWORD, value: staging-admin-123 }
-      - { key: RUN_SCHEDULER, value: "false" }
+      - { key: TRUST_PROXY, value: "1" }
+      - { key: JWT_SECRET, generateValue: true }
+      - { key: SEED_DEMO, value: "true" }
+      # Staging may keep uploads on the (temporary) server disk; they vanish on redeploy.
+      - { key: ALLOW_LOCAL_UPLOADS, value: "true" }
+      - { key: SIGN_IN_ALERTS, value: "false" }
+      - { key: DATABASE_URL, sync: false }      # a separate Neon branch, never the live data
+      - { key: DIRECT_URL, sync: false }
+      - { key: FRONTEND_URL, sync: false }      # the Vercel preview address for the staging branch
+      - { key: ADMIN_EMAIL, sync: false }
+      - { key: ADMIN_NAME, sync: false }
+      - { key: ADMIN_PASSWORD, sync: false }
+      - { key: BREVO_API_KEY, sync: false }
+      - { key: EMAIL_FROM, sync: false }
+      - { key: GEMINI_API_KEY, sync: false }
